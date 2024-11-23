@@ -2,6 +2,15 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import ttkbootstrap as ttkb
 from controllers.product_controller import ProductController
+import requests
+from config.config import VERSION
+import zipfile
+import os
+import sys
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import smtplib
+
 
 class EMAGApp:
     def __init__(self, root):
@@ -14,6 +23,10 @@ class EMAGApp:
         self.create_toolbar()
         self.create_layout()
         self.create_status_bar()
+        self.check_for_updates()
+        self.update_parts_list()
+        self.update_products_list()
+
 
     def setup_styles(self):
         """Configure consistent theme styles"""
@@ -60,10 +73,25 @@ class EMAGApp:
 
         ttkb.Button(
             self.toolbar,
-            text="Dark Mode",
+            text="Ciemny motyw",
             bootstyle="secondary-outline",
             command=self.toggle_dark_mode,
         ).pack(side="right", padx=10)
+
+        ttkb.Button(
+            self.toolbar,
+            text="Sprawdź aktualizacje",
+            bootstyle="info-outline",
+            command=self.check_for_updates,  # Call the update check function
+        ).pack(side="right", padx=10)
+
+        ttkb.Button(
+            self.toolbar,
+            text="Zgłoś błąd",
+            bootstyle="danger-outline",
+            command=self.show_feedback_form,
+        ).pack(side="right", padx=10)
+
 
 
     def toggle_dark_mode(self):
@@ -209,18 +237,28 @@ class EMAGApp:
         button.pack(pady=10)
 
     def update_parts_list(self):
-        """Update the parts list in the Treeview."""
+        """Update the parts list in the Treeview with Firebase data."""
+        # Load inventory from Firebase
+        self.controller.db.load_inventory_from_firebase()
+        
+        # Update the Treeview
         self.parts_list.delete(*self.parts_list.get_children())
         for part, quantity in self.controller.db.inventory.items():
             self.parts_list.insert("", "end", values=(part, quantity))
 
+
     def update_products_list(self):
-        """Updates the products list in the Treeview."""
+        """Update the products list in the Treeview with Firebase data."""
+        # Load products from Firebase
+        self.controller.db.load_products_from_firebase()
+
+        # Update the Treeview
         self.products_list.delete(*self.products_list.get_children())
         for product in self.controller.db.products:
             product_name = product["name"]
             product_quantity = product["quantity"]
             self.products_list.insert("", "end", values=(product_name, product_quantity))
+
 
 
     def show_add_part_menu(self):
@@ -276,15 +314,22 @@ class EMAGApp:
 
         # Add button
         def add_part():
+            """Add a part to the inventory and update Firebase."""
             part_name = part_name_var.get()
             size = size_var.get()
             quantity = quantity_entry.get()
+
             if not quantity.isdigit() or int(quantity) <= 0:
                 messagebox.showerror("Błąd", "Podaj poprawną ilość.")
                 return
-            self.controller.add_part_to_inventory(part_name, size, int(quantity))
+
+            # Add part to Firebase database
+            self.controller.db.add_part(f"{part_name} ({size})", int(quantity))
+            
+            # Update the parts list in the UI
             self.update_parts_list()
             messagebox.showinfo("Sukces", f"Część '{part_name} ({size})' została dodana.")
+
 
         ttkb.Button(
             self.right_frame,
@@ -461,6 +506,7 @@ class EMAGApp:
 
         # Add Product Functionality
         def add_product():
+            """Add a product and sync with Firebase."""
             product_name = product_name_var.get()
             if not product_name:
                 messagebox.showerror("Błąd", "Podaj nazwę produktu.")
@@ -499,32 +545,25 @@ class EMAGApp:
                     )
                     return
 
-            # Deduct the required parts from inventory
+            # Deduct the required parts from Firebase
             for part_name, quantity_per_product in selected_parts.items():
                 total_quantity_needed = quantity_per_product * product_quantity
-                self.controller.db.inventory[part_name] -= total_quantity_needed
+                new_quantity = self.controller.db.inventory[part_name] - total_quantity_needed
+                self.controller.db.add_part(part_name, new_quantity)
 
-            # Check if product already exists in the database
-            existing_product = next(
-                (product for product in self.controller.db.products if product["name"] == product_name), None
-            )
-            if existing_product:
-                # Increment the quantity of the existing product
-                existing_product["quantity"] += product_quantity
-            else:
-                # Add new product to the database
-                self.controller.db.add_product({
-                    "name": product_name,
-                    "quantity": product_quantity,
-                    "parts": selected_parts,
-                })
+            # Add product to Firebase
+            product = {
+                "name": product_name,
+                "quantity": product_quantity,
+                "parts": selected_parts,
+            }
+            self.controller.db.add_product(product)
 
-            # Refresh product list
+            # Refresh the UI
             self.update_products_list()
-            # Refresh parts list to reflect inventory changes
             self.update_parts_list()
-
             messagebox.showinfo("Sukces", f"Produkt '{product_name}' został dodany.")
+
 
 
 
@@ -651,6 +690,135 @@ class EMAGApp:
         """Clear all widgets from the right frame"""
         for widget in self.right_frame.winfo_children():
             widget.destroy()
+
+    def show_feedback_form(self):
+        """Display the feedback form in a new window."""
+        feedback_window = tk.Toplevel(self.root)
+        feedback_window.title("Zgłoś błąd")
+        feedback_window.geometry("600x500")
+        feedback_window.resizable(False, False)
+
+        # Feedback form components
+        ttkb.Label(feedback_window, text="Kategoria:", font=("Arial", 12)).pack(anchor="w", padx=10, pady=5)
+        category_var = tk.StringVar(value="UI Bug")
+        categories = ["UI Bug", "Funkcjonalność", "Crash/Error", "Inne"]
+        category_menu = ttkb.OptionMenu(feedback_window, category_var, *categories)
+        category_menu.pack(fill="x", padx=10, pady=5)
+
+        ttkb.Label(feedback_window, text="Opis błędu:", font=("Arial", 12)).pack(anchor="w", padx=10, pady=5)
+        message_text = tk.Text(feedback_window, wrap="word", height=10, font=("Arial", 12))
+        message_text.pack(fill="both", expand=True, padx=10, pady=5)
+
+        def send_feedback():
+            """Send feedback via email."""
+            category = category_var.get()
+            message = message_text.get("1.0", "end").strip()
+            if not message:
+                messagebox.showerror("Błąd", "Wiadomość nie może być pusta.")
+                return
+
+            try:
+                # Email configuration
+                sender_email = "app.emag@gmail.com"  # Replace with your app's email
+                sender_password = "pvzc vlfx tndc nssh"  # Replace with your email password
+                recipient_email = "devrzeszowski@gmail.com"  # Replace with your personal email
+                subject = f"Bug Report - {category}"
+
+                # Construct the email
+                email_message = MIMEMultipart()
+                email_message["From"] = sender_email
+                email_message["To"] = recipient_email
+                email_message["Subject"] = subject
+                email_message.attach(MIMEText(message, "plain"))
+
+                # Send the email
+                with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                    server.starttls()
+                    server.login(sender_email, sender_password)
+                    server.sendmail(sender_email, recipient_email, email_message.as_string())
+
+                messagebox.showinfo("Wiadomość została wysłana.")
+                feedback_window.destroy()
+
+            except Exception as e:
+                print(f"Błąd: {e}")
+                messagebox.showerror("Błąd", "Spróbuj później")
+
+        ttkb.Button(
+            feedback_window,
+            text="Wyślij",
+            bootstyle="success",
+            command=send_feedback,
+        ).pack(pady=10, padx=10)
+
+
+    def check_for_updates(self):
+        """Check for updates by comparing the local version with the remote version."""
+        try:
+            # URL of the version file and the update package in your GitHub repository
+            remote_version_url = "https://raw.githubusercontent.com/filiprzeszowski/EMAG/refs/tags/EMAG/config/config.py"
+            update_package_url = "https://github.com/filiprzeszowski/EMAG/releases/download/latest/update.zip"
+
+            # Fetch the remote version file
+            response = requests.get(remote_version_url)
+            response.raise_for_status()  # Raise an exception for HTTP errors
+
+            # Get the latest version from the file
+            remote_version = response.text.strip()
+
+            # Compare versions
+            if VERSION < remote_version:
+                # Ask user for confirmation to update
+                should_update = messagebox.askyesno(
+                    "Aktualizacja dostępna",
+                    f"Nowa wersja ({remote_version}) jest dostępna. Aktualna wersja: {VERSION}.\n\n"
+                    "Czy pobrać aktualizację?"
+                )
+                if should_update:
+                    self.download_and_apply_update(update_package_url)
+
+        except requests.exceptions.RequestException as e:
+            print(f"Błąd sprawdzania aktualizacji: {e}")
+            messagebox.showerror("Błąd sprawdzania aktualizacji", "Zgłoszenie zostało wysłane.")
+
+    def download_and_apply_update(self, update_package_url):
+        """Download and apply the update package."""
+        try:
+            # Download the update package
+            response = requests.get(update_package_url, stream=True)
+            response.raise_for_status()
+
+            # Save the zip file locally
+            update_zip_path = "update.zip"
+            with open(update_zip_path, "wb") as update_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    update_file.write(chunk)
+
+            # Extract the update package
+            with zipfile.ZipFile(update_zip_path, "r") as zip_ref:
+                zip_ref.extractall(".")  # Extract into the current directory
+
+            # Clean up the downloaded zip file
+            os.remove(update_zip_path)
+
+            # Notify user and restart the app
+            messagebox.showinfo(
+                "Update Applied",
+                "The application has been updated successfully. The app will now restart."
+            )
+            self.restart_app()
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error downloading the update: {e}")
+            messagebox.showerror("Update Failed", "Failed to download the update. Please try again later.")
+        except zipfile.BadZipFile as e:
+            print(f"Error extracting the update package: {e}")
+            messagebox.showerror("Update Failed", "The update package is corrupted.")
+
+    def restart_app(self):
+        """Restart the application."""
+        python = sys.executable
+        os.execl(python, python, *sys.argv)
 
 def run_gui():
     root = ttkb.Window("EMAG", themename="cosmo")
