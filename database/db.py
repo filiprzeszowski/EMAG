@@ -1,25 +1,28 @@
-import firebase_admin
-from firebase_admin import credentials, db
 import os
+from dotenv import load_dotenv
+from firebase_admin import credentials, initialize_app, db
+
+# Correct path to load the .env file in the 'database' directory
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(dotenv_path=dotenv_path)
+
 
 class Database:
-    """Database class for managing inventory and products with Firebase support."""
-
     def __init__(self):
-        self.inventory = {}  # Inventory with parts
-        self.products = []   # List of final products
-
-        # Initialize Firebase connection
+        self.inventory = {}
+        self.products = []
         self.initialize_firebase()
-
 
     def initialize_firebase(self):
         """Initialize Firebase Admin SDK."""
-        firebase_key_path = os.path.join(os.path.dirname(__file__), 'firebase_key.json')
+        firebase_key_path = os.getenv("FIREBASE_KEY_PATH")
+        if not firebase_key_path:
+            raise ValueError("FIREBASE_KEY_PATH is not set in the environment variables.")
+        
         try:
-            cred = credentials.Certificate(firebase_key_path)  # Replace with your Firebase key path
-            firebase_admin.initialize_app(cred, {
-                "databaseURL": "https://emag-14f01-default-rtdb.europe-west1.firebasedatabase.app/"  # Replace with your Firebase database URL
+            cred = credentials.Certificate(firebase_key_path)
+            initialize_app(cred, {
+                "databaseURL": "https://emag-14f01-default-rtdb.europe-west1.firebasedatabase.app/"  # Replace with your Firebase URL
             })
         except Exception as e:
             print(f"Error initializing Firebase: {e}")
