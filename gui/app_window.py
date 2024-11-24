@@ -9,7 +9,9 @@ import os
 import sys
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import smtplib
+import smtplib, shutil
+import ttkbootstrap as ttkb
+from ttkbootstrap.constants import *
 
 
 class EMAGApp:
@@ -17,399 +19,388 @@ class EMAGApp:
         self.controller = ProductController()
         self.root = root
         self.root.title("EMAG - Zarządzanie magazynem")
-        self.root.state("zoomed")  # Fullscreen
-        self.dark_mode = False  # Default: Light Mode
+        self.root.state("zoomed")
+        self.dark_mode = False
         self.setup_styles()
-        self.create_toolbar()
+        self.create_header()
         self.create_layout()
         self.create_status_bar()
         self.check_for_updates()
         self.update_parts_list()
         self.update_products_list()
 
-
     def setup_styles(self):
         """Configure consistent theme styles"""
         self.style = ttkb.Style("cosmo")  # Modern theme
-        self.root.configure(bg=self.style.colors.bg)
+        self.root.configure(bg="#BEE9E8")  # Set primary app background
 
         # Global widget styles
         self.style.configure(
             "TLabel",
-            background=self.style.colors.bg,  # Match app background
-            foreground=self.style.colors.fg,
+            background="#BEE9E8",  # Match main app background
+            foreground="#1B4965",  # Text color
+            font=("Arial", 12),
         )
         self.style.configure(
             "TButton",
-            font=("Arial", 12),
-            background=self.style.colors.primary,
-            foreground=self.style.colors.light,
-        )
-        self.style.configure(
-            "TEntry",
-            fieldbackground=self.style.colors.bg,
-            foreground=self.style.colors.fg,
+            font=("Arial", 14, "bold"),
+            background="#5FA8D3",
+            foreground="white",
+            borderwidth=1,
+            padding=5,
         )
         self.style.configure(
             "Treeview",
-            background=self.style.colors.bg,
-            fieldbackground=self.style.colors.bg,
-            foreground=self.style.colors.fg,
+            background="#CAE9FF",
+            fieldbackground="#CAE9FF",
+            foreground="#1B4965",
+        )
+        self.style.map(
+            "TButton",
+            background=[("active", "#CAE9FF")],  # Lighter blue on hover
+            foreground=[("active", "#1B4965")],
+        )
+        self.style.configure(
+            "TEntry",
+            fieldbackground="#FFFFFF",  # Entry fields with a clean white background
+            foreground="#1B4965",
         )
 
-
-    def create_toolbar(self):
-        """Create a modern toolbar with consistent theme colors"""
-        self.toolbar = ttkb.Frame(self.root, padding=10, bootstyle="primary")
-        self.toolbar.pack(side="top", fill="x")
+    def create_header(self):
+        """Create a header with branding."""
+        header = ttkb.Frame(self.root, bootstyle=PRIMARY, padding=10)
+        header.pack(side=TOP, fill=X)
 
         ttkb.Label(
-            self.toolbar,
+            header,
             text="EMAG - Zarządzanie magazynem",
-            font=("Arial", 16, "bold"),
-            anchor="w",
-            bootstyle="inverse-primary",
-        ).pack(side="left", padx=10)
-
-        ttkb.Button(
-            self.toolbar,
-            text="Ciemny motyw",
-            bootstyle="secondary-outline",
-            command=self.toggle_dark_mode,
-        ).pack(side="right", padx=10)
-
-        ttkb.Button(
-            self.toolbar,
-            text="Sprawdź aktualizacje",
-            bootstyle="info-outline",
-            command=self.check_for_updates,  # Call the update check function
-        ).pack(side="right", padx=10)
-
-        ttkb.Button(
-            self.toolbar,
-            text="Zgłoś błąd",
-            bootstyle="danger-outline",
-            command=self.show_feedback_form,
-        ).pack(side="right", padx=10)
-
-
-
-    def toggle_dark_mode(self):
-        """Toggle dark mode for the application"""
-        self.dark_mode = not self.dark_mode
-        theme = "darkly" if self.dark_mode else "cosmo"
-        self.style.theme_use(theme)
-
-    def get_colors(self):
-        """Retrieve colors for the current mode."""
-        if self.dark_mode:
-            return {
-                "bg": "#ffffff",
-                "menu_bg": "#f0f0f0",
-                "notebook_bg": "#f8f9fa",
-                "right_frame_bg": "#f8f9fa",
-                "status_bg": "#e8e8e8",
-                "status_fg": "black",
-                "button_bg": "#555555",
-                "button_fg": "white",
-            }
-        else:
-            return {
-                "bg": "#121212",
-                "menu_bg": "#1f1f1f",
-                "notebook_bg": "#2e2e2e",
-                "right_frame_bg": "#1f1f1f",
-                "status_bg": "#1c1c1c",
-                "status_fg": "white",
-                "button_bg": "#333333",
-                "button_fg": "white",
-            }
+            font=("Arial", 18, "bold"),
+            anchor=CENTER,
+            foreground="white",
+        ).pack()
 
     def create_layout(self):
-        """Create the main layout with responsive middle list."""
-        # Create a container frame for left (menu), middle (notebook), and right sections
+        """Create a clean and responsive layout with proportional adjustments."""
+        # Main Frame
         self.main_frame = ttkb.Frame(self.root)
-        self.main_frame.pack(fill="both", expand=True)
+        self.main_frame.pack(fill=BOTH, expand=True)
 
-        # Side Menu
-        self.menu_frame = ttkb.Frame(self.main_frame, padding=10, bootstyle="secondary")
-        self.menu_frame.pack(side="left", fill="y", padx=10, pady=10)
+        # Sidebar Menu
+        self.menu_frame = ttkb.Frame(self.main_frame, width=200)
+        self.menu_frame.pack(side=LEFT, fill=Y, padx=5)
 
+        # Set menu background color using a valid approach
+        menu_bg_color = "#1B4965"  # Unified background color
+        self.menu_frame.configure(style="TFrame")
+        self.style.configure(
+            "TFrame",
+            background=menu_bg_color,
+        )
+
+        # Menu Header
         ttkb.Label(
             self.menu_frame,
             text="Menu",
             font=("Arial", 16, "bold"),
+            background=menu_bg_color,
+            foreground="white",
             anchor="center",
-            bootstyle="primary",
-        ).pack(pady=10)
+        ).pack(pady=(10, 20))
 
-        self.create_menu_buttons()
-
-        # Middle Section (Notebook)
-        self.notebook_frame = ttkb.Frame(self.main_frame, padding=10)
-        self.notebook_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
-
-        self.notebook = ttkb.Notebook(self.notebook_frame, bootstyle="primary")
-        self.notebook.pack(fill="both", expand=True)
-
-        # Parts Tab
-        self.parts_tab = ttkb.Frame(self.notebook, padding=10)
-        self.notebook.add(self.parts_tab, text="Części")
-
-        self.parts_list = self.create_treeview(self.parts_tab)
-        self.parts_list.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # Products Tab
-        self.products_tab = ttkb.Frame(self.notebook, padding=10)
-        self.notebook.add(self.products_tab, text="Produkty")
-
-        self.products_list = self.create_treeview(self.products_tab)
-        self.products_list.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # Right Frame
-        self.right_frame = ttkb.Frame(self.main_frame, padding=10, bootstyle="secondary", width=300)
-        self.right_frame.pack(side="right", fill="y", padx=10, pady=10)
-
-        # Prevent the right frame from propagating its size to the parent
-        self.right_frame.pack_propagate(False)
-
-
-
-    def create_menu_buttons(self):
-        """Add buttons to the side menu"""
-        buttons = [
+        # Menu Buttons
+        menu_buttons = [
             ("Dodaj Część", self.show_add_part_menu),
             ("Edytuj Część", self.show_edit_part_menu),
             ("Dodaj Produkt", self.show_add_product_menu),
             ("Edytuj Produkt", self.show_edit_product_menu),
         ]
-        for text, command in buttons:
+        for text, command in menu_buttons:
             ttkb.Button(
                 self.menu_frame,
                 text=text,
-                bootstyle="primary",
+                bootstyle="success-outline",
                 command=command,
-            ).pack(fill="x", pady=5)
+            ).pack(fill=X, pady=5)
 
-    def create_treeview(self, parent):
-        """Create a styled treeview"""
-        tree = ttkb.Treeview(
-            parent,
-            columns=("name", "quantity"),
-            show="headings",
-            style="Treeview"
+        # Middle Section (Notebook)
+        self.notebook_frame = ttkb.Frame(self.main_frame, padding=10, width=700)  # Increased width
+        self.notebook_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=10, pady=10)
+
+        self.notebook = ttkb.Notebook(self.notebook_frame)
+        self.notebook.pack(fill=BOTH, expand=True)
+
+        # Parts Tab
+        self.parts_tab = ttkb.Frame(self.notebook)
+        self.notebook.add(self.parts_tab, text="Części")
+        self.parts_list = self.create_treeview(self.parts_tab, columns=("name", "quantity"))
+        self.parts_list.pack(fill=BOTH, expand=True, padx=10, pady=10)
+
+        # Products Tab
+        self.products_tab = ttkb.Frame(self.notebook)
+        self.notebook.add(self.products_tab, text="Produkty")
+        self.products_list = self.create_treeview(
+            self.products_tab, columns=("name", "quantity", "parts")
         )
-        tree.heading("name", text="Nazwa")
-        tree.heading("quantity", text="Ilość")
-        tree.column("name", width=300)
-        tree.column("quantity", width=100, anchor="center")
+        self.products_list.heading("parts", text="Części")
+        self.products_list.column("parts", width=300)
+        self.products_list.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-        # Ensure background matches theme
-        tree.tag_configure("oddrow", background=self.style.colors.bg)
-        tree.tag_configure("evenrow", background=self.style.colors.border)
+        # Right Panel
+        self.right_frame = ttkb.Frame(
+            self.main_frame, padding=10, width=400  # Adjusted width
+        )
+        self.right_frame.pack(side=RIGHT, fill=BOTH, padx=10, pady=10)
+        self.right_frame.pack_propagate(False)
 
+    def create_treeview(self, parent, columns):
+        """Create a styled treeview."""
+        tree = ttkb.Treeview(parent, columns=columns, show="headings", style="Treeview")
+        for col in columns:
+            tree.heading(col, text=col.capitalize())
+            tree.column(col, anchor=CENTER, width=150)
         return tree
 
-
     def create_status_bar(self):
-        """Add a modern status bar"""
+        """Create a status bar."""
         self.status_bar = ttkb.Label(
             self.root,
             text="Gotowy",
-            anchor="w",
-            bootstyle="inverse-dark",
-            font=("Arial", 10),
+            anchor=W,
+            bootstyle=SECONDARY,
+            padding=5,
         )
-        self.status_bar.pack(side="bottom", fill="x")
+        self.status_bar.pack(side=BOTTOM, fill=X)
 
-    def create_animated_button(self, parent, text, command):
-        """Create a button with hover animation."""
-        button = tk.Button(parent, text=text, font=("Arial", 12), bg="#555555", fg="white", command=command)
-
-        def on_enter(event):
-            button.config(bg="#007BFF")
-
-        def on_leave(event):
-            button.config(bg="#555555")
-
-        button.bind("<Enter>", on_enter)
-        button.bind("<Leave>", on_leave)
-        button.pack(pady=10)
+    def toggle_dark_mode(self):
+        """Toggle dark/light mode."""
+        self.dark_mode = not self.dark_mode
+        theme = "darkly" if self.dark_mode else "litera"
+        self.style.theme_use(theme)
 
     def update_parts_list(self):
         """Update the parts list in the Treeview with Firebase data."""
-        # Load inventory from Firebase
-        self.controller.db.load_inventory_from_firebase()
-        
-        # Update the Treeview
-        self.parts_list.delete(*self.parts_list.get_children())
-        for part, quantity in self.controller.db.inventory.items():
-            self.parts_list.insert("", "end", values=(part, quantity))
+        try:
+            self.controller.db.load_inventory_from_firebase()
+            self.parts_list.delete(*self.parts_list.get_children())
+            for i, (part, quantity) in enumerate(self.controller.db.inventory.items()):
+                tag = "oddrow" if i % 2 == 0 else "evenrow"
+                self.parts_list.insert("", "end", values=(part, quantity), tags=(tag,))
+        except Exception as e:
+            print(f"Error loading inventory: {e}")
+            messagebox.showerror("Error", "Could not load inventory.")
+
+
+    def create_header(self):
+        """Create a modern and visually appealing header."""
+        # Header Frame
+        self.header = ttkb.Frame(self.root, padding=10, bootstyle="primary")
+        self.header.pack(side="top", fill="x")
+
+        # Application Title
+        ttkb.Label(
+            self.header,
+            text="EMAG - Zarządzanie Magazynem",
+            font=("Arial", 20, "bold"),
+            bootstyle="inverse-primary",
+            anchor="w",
+        ).pack(side="left", padx=20)
+
+        # Centered Placeholder or Logo
+        self.logo_label = ttkb.Label(
+            self.header,
+            text="🔧",  # Replace with a logo icon or image if available
+            font=("Arial", 20),
+            bootstyle="inverse-primary",
+        )
+        self.logo_label.pack(side="left", padx=10)
+
+        # Buttons Section (on the right)
+        ttkb.Button(
+            self.header,
+            text="Zgłoś błąd",
+            bootstyle="danger-outline",
+            command=self.show_feedback_form,
+        ).pack(side="right", padx=10)
+
+        ttkb.Button(
+            self.header,
+            text="Sprawdź aktualizacje",
+            bootstyle="success-outline",
+            command=self.check_for_updates,
+        ).pack(side="right", padx=10)
+
+        self.dark_mode_button = ttkb.Button(
+            self.header,
+            text="Ciemny motyw",
+            bootstyle="secondary-outline",
+            command=self.toggle_dark_mode,
+        )
+        self.dark_mode_button.pack(side="right", padx=10)
+
 
 
     def update_products_list(self):
-        """Update the products list in the Treeview with Firebase data."""
-        # Load products from Firebase
-        self.controller.db.load_products_from_firebase()
+        """Update the products list in the TreeView."""
+        try:
+            # Load products from Firebase
+            self.controller.db.load_products_from_firebase()
 
-        # Update the Treeview
-        self.products_list.delete(*self.products_list.get_children())
-        for product in self.controller.db.products:
-            product_name = product["name"]
-            product_quantity = product["quantity"]
-            self.products_list.insert("", "end", values=(product_name, product_quantity))
+            # Combine products with the same name and identical parts
+            combined_products = {}
+            for product in self.controller.db.products:
+                key = (product["name"], frozenset(product["parts"].items()))
+                if key in combined_products:
+                    combined_products[key]["quantity"] += product["quantity"]
+                else:
+                    combined_products[key] = {
+                        "name": product["name"],
+                        "quantity": product["quantity"],
+                        "parts": product["parts"],
+                    }
 
+            # Clear the TreeView
+            self.products_list.delete(*self.products_list.get_children())
+
+            # Populate the TreeView
+            for product in combined_products.values():
+                parts_str = ", ".join(
+                    [f"{part} ({qty})" for part, qty in product["parts"].items()]
+                )
+                self.products_list.insert(
+                    "",
+                    "end",
+                    values=(product["name"], product["quantity"], parts_str),
+                )
+        except Exception as e:
+            print(f"Error updating products list: {e}")
 
 
     def show_add_part_menu(self):
-        """Display the Add Part menu with responsive design."""
+        """Display the Add Part menu with improved styling and functionality."""
         self.clear_right_frame()
 
-        # Set frame title with theme-consistent styling
+        # Title
         ttkb.Label(
             self.right_frame,
             text="Dodaj Część",
-            font=("Arial", 14, "bold"),
+            font=("Arial", 18, "bold"),
             bootstyle="inverse-secondary",
+            anchor="center",
         ).pack(pady=10)
 
-        form_frame = ttkb.LabelFrame(
-            self.right_frame, text="Dodaj Część",
-            padding=10,
-            bootstyle="secondary"
+        # Form Frame
+        form_frame = ttkb.Labelframe(
+            self.right_frame,
+            text="Formularz",
+            bootstyle="secondary",
+            padding=20,
         )
-        form_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        form_frame.pack(fill=BOTH, padx=20, pady=20, expand=True)
 
-        # Part selection
-        ttkb.Label(form_frame, text="Wybierz część:", font=("Arial", 12)).grid(row=0, column=0, sticky="w", pady=5)
+        # Part Selection
+        ttkb.Label(form_frame, text="Wybierz część:", font=("Arial", 12, "bold")).grid(row=0, column=0, sticky="w", pady=10)
         part_name_var = tk.StringVar()
         available_parts = list(self.controller.get_available_parts().keys())
         part_name_var.set(available_parts[0])  # Default to the first part
-        part_menu = ttkb.OptionMenu(form_frame, part_name_var, *available_parts)
-        part_menu.grid(row=0, column=1, pady=5, sticky="ew")
+        ttkb.OptionMenu(form_frame, part_name_var, *available_parts).grid(row=0, column=1, sticky="ew", pady=10, padx=10)
 
-        # Size selection
-        ttkb.Label(form_frame, text="Wybierz rozmiar:", font=("Arial", 12)).grid(row=1, column=0, sticky="w", pady=5)
+        # Size Selection
+        ttkb.Label(form_frame, text="Wybierz rozmiar:", font=("Arial", 12, "bold")).grid(row=1, column=0, sticky="w", pady=10)
         size_var = tk.StringVar()
-        initial_sizes = self.controller.get_available_parts()[available_parts[0]]
-        size_var.set(initial_sizes[0])  # Default size
-        size_menu = ttkb.OptionMenu(form_frame, size_var, *initial_sizes)
-        size_menu.grid(row=1, column=1, pady=5, sticky="ew")
+        size_menu = ttkb.OptionMenu(form_frame, size_var, "")  # Initially empty
+        size_menu.grid(row=1, column=1, sticky="ew", pady=10, padx=10)
 
-        # Update size menu when part changes
+        # Populate sizes dynamically based on part selection
         def update_size_menu(*args):
             selected_part = part_name_var.get()
             sizes = self.controller.get_available_parts()[selected_part]
             size_var.set(sizes[0])  # Default to the first size
-            size_menu["menu"].delete(0, "end")
+            menu = size_menu["menu"]
+            menu.delete(0, "end")  # Clear existing menu items
             for size in sizes:
-                size_menu["menu"].add_command(label=size, command=lambda value=size: size_var.set(value))
+                menu.add_command(label=size, command=lambda value=size: size_var.set(value))
 
-        part_name_var.trace_add("write", update_size_menu)
+        part_name_var.trace_add("write", update_size_menu)  # Trigger when part changes
 
-        # Quantity input
-        ttkb.Label(form_frame, text="Podaj ilość:", font=("Arial", 12)).grid(row=2, column=0, sticky="w", pady=5)
-        quantity_entry = ttkb.Entry(form_frame, font=("Arial", 12))
-        quantity_entry.grid(row=2, column=1, pady=5, sticky="ew")
+        # Trigger the size menu update for the initial selection
+        update_size_menu()
 
-        # Add button
+        # Quantity Input
+        ttkb.Label(form_frame, text="Podaj ilość:", font=("Arial", 12, "bold")).grid(row=2, column=0, sticky="w", pady=10)
+        quantity_var = tk.StringVar()
+        ttkb.Entry(form_frame, textvariable=quantity_var, font=("Arial", 12)).grid(row=2, column=1, sticky="ew", pady=10, padx=10)
+
+        # Add Button
         def add_part():
-            """Add a part to the inventory and update Firebase."""
+            """Add the part to inventory."""
             part_name = part_name_var.get()
             size = size_var.get()
-            quantity = quantity_entry.get()
-
+            quantity = quantity_var.get()
             if not quantity.isdigit() or int(quantity) <= 0:
                 messagebox.showerror("Błąd", "Podaj poprawną ilość.")
                 return
-
-            # Add part to Firebase database
-            self.controller.db.add_part(f"{part_name} ({size})", int(quantity))
-            
-            # Update the parts list in the UI
+            full_part_name = f"{part_name} ({size})"
+            self.controller.db.add_part(full_part_name, int(quantity))
             self.update_parts_list()
-            messagebox.showinfo("Sukces", f"Część '{part_name} ({size})' została dodana.")
-
+            messagebox.showinfo("Sukces", f"Część '{full_part_name}' została dodana.")
 
         ttkb.Button(
             self.right_frame,
             text="Dodaj",
             bootstyle="success",
             command=add_part,
-        ).pack(pady=10, fill="x")
+        ).pack(pady=20, padx=20, fill="x")
 
 
     def show_edit_part_menu(self):
-        """Display the Edit Part menu"""
+        """Display the Edit Part menu."""
         self.clear_right_frame()
+
+        # Set frame title
         ttkb.Label(
             self.right_frame,
             text="Edytuj Część",
-            font=("Arial", 14, "bold"),
-            bootstyle="inverse",
-        ).pack(pady=10)
-
-        part_name_var = tk.StringVar(self.right_frame)
-        part_name_var.set(list(self.controller.get_available_parts().keys())[0])
-
-        tk.Label(self.right_frame, text="Wybierz część:", font=("Arial", 12), bg="#f0f0f0").pack(
-            pady=5
-        )
-        part_menu = tk.OptionMenu(
-            self.right_frame,
-            part_name_var,
-            *self.controller.get_available_parts().keys(),
-        )
-        part_menu.pack(pady=10)
-
-        size_var = tk.StringVar(self.right_frame)
-        initial_sizes = self.controller.get_available_parts()[part_name_var.get()]
-        size_var.set(initial_sizes[0])
-
-        tk.Label(self.right_frame, text="Wybierz rozmiar:", font=("Arial", 12), bg="#f0f0f0").pack(
-            pady=5
-        )
-        size_menu = tk.OptionMenu(self.right_frame, size_var, *initial_sizes)
-        size_menu.pack(pady=10)
-
-        # Aktualizacja rozmiarów po wyborze części
-        def update_size_menu(*args):
-            selected_part = part_name_var.get()
-            sizes = self.controller.get_available_parts()[selected_part]
-            size_var.set(sizes[0])  # Domyślny rozmiar
-            size_menu["menu"].delete(0, "end")  # Wyczyszczenie starego menu
-            for size in sizes:
-                size_menu["menu"].add_command(
-                    label=size, command=lambda value=size: size_var.set(value)
-                )
-
-        part_name_var.trace("w", update_size_menu)
-
-        tk.Label(self.right_frame, text="Podaj zmianę ilości (+/-):", font=("Arial", 12), bg="#f0f0f0").pack(
-            pady=5
-        )
-        delta_entry = tk.Entry(self.right_frame, font=("Arial", 12))
-        delta_entry.pack(pady=10)
-
-        def edit_part():
-            part_name = part_name_var.get()
-            size = size_var.get()
-            delta = delta_entry.get()
-            if not delta.lstrip('-').isdigit():
-                messagebox.showerror("Błąd", "Podaj poprawną liczbę.")
-                return
-            self.controller.edit_part_quantity(part_name, size, int(delta))
-            self.update_parts_list()
-            messagebox.showinfo("Sukces", f"Część '{part_name} ({size})' została zmieniona.")
-
-        tk.Button(
-            self.right_frame,
-            text="Zapisz",
-            font=("Arial", 12),
-            bg="#28a745",
-            fg="white",
-            command=edit_part,
+            font=("Arial", 18, "bold"),
+            bootstyle="inverse-secondary",
+            anchor="center",
         ).pack(pady=20)
+
+        # Create form frame
+        form_frame = ttkb.Frame(self.right_frame, padding=10, bootstyle="secondary")
+        form_frame.pack(fill="x", padx=20, pady=10)
+
+        # Part Selection
+        ttkb.Label(form_frame, text="Wybierz część:", font=("Arial", 12)).grid(row=0, column=0, sticky="w", pady=10, padx=5)
+        part_name_var = tk.StringVar()
+        available_parts = list(self.controller.db.inventory.keys())
+        part_name_var.set(available_parts[0])
+        ttkb.OptionMenu(form_frame, part_name_var, *available_parts).grid(row=0, column=1, pady=10, padx=10, sticky="ew")
+
+        # Quantity Change Input
+        ttkb.Label(form_frame, text="Zmień ilość (+/-):", font=("Arial", 12)).grid(row=1, column=0, sticky="w", pady=10, padx=5)
+        delta_var = tk.StringVar()
+        ttkb.Entry(form_frame, textvariable=delta_var, font=("Arial", 12)).grid(row=1, column=1, pady=10, padx=10, sticky="ew")
+
+        # Edit Button
+        def edit_part():
+            """Edit the selected part quantity."""
+            part_name = part_name_var.get()
+            try:
+                delta = int(delta_var.get())
+            except ValueError:
+                messagebox.showerror("Błąd", "Podaj poprawną liczbę dla zmiany ilości.")
+                return
+            new_quantity = self.controller.db.get_part(part_name) + delta
+            self.controller.db.add_part(part_name, new_quantity)
+            self.update_parts_list()
+            messagebox.showinfo("Sukces", f"Część '{part_name}' została zaktualizowana.")
+
+        ttkb.Button(
+            self.right_frame,
+            text="Zapisz Zmiany",
+            bootstyle="success",
+            command=edit_part,
+        ).pack(pady=20, padx=20, fill="x")
 
     def show_add_product_menu(self):
         """Display the Add Product menu"""
@@ -506,7 +497,7 @@ class EMAGApp:
 
         # Add Product Functionality
         def add_product():
-            """Add a product and sync with Firebase."""
+            """Add a product to the inventory."""
             product_name = product_name_var.get()
             if not product_name:
                 messagebox.showerror("Błąd", "Podaj nazwę produktu.")
@@ -527,7 +518,10 @@ class EMAGApp:
                 quantity = int(quantity)
                 if quantity > 0:
                     if quantity > int(available):
-                        messagebox.showerror("Błąd", f"Ilość części '{part_name}' przekracza dostępne {available}.")
+                        messagebox.showerror(
+                            "Błąd",
+                            f"Ilość części '{part_name}' przekracza dostępne {available}.",
+                        )
                         return
                     selected_parts[part_name] = quantity
 
@@ -535,20 +529,36 @@ class EMAGApp:
                 messagebox.showerror("Błąd", "Wybierz przynajmniej jedną część.")
                 return
 
-            # Check if there are enough parts for the desired quantity of products
+            # Prevent duplicate product creation
+            existing_product = next(
+                (
+                    p
+                    for p in self.controller.db.products
+                    if p["name"] == product_name and p["parts"] == selected_parts
+                ),
+                None,
+            )
+            if existing_product:
+                messagebox.showerror(
+                    "Błąd",
+                    f"Produkt '{product_name}' z identycznymi częściami już istnieje."
+                )
+                return
+
+            # Deduct the required parts from inventory
             for part_name, quantity_per_product in selected_parts.items():
                 total_quantity_needed = quantity_per_product * product_quantity
                 if self.controller.db.inventory.get(part_name, 0) < total_quantity_needed:
                     messagebox.showerror(
                         "Błąd",
-                        f"Niewystarczająca ilość części '{part_name}' do utworzenia {product_quantity} sztuk produktu.",
+                        f"Niewystarczająca ilość części '{part_name}' do utworzenia produktu.",
                     )
                     return
 
-            # Deduct the required parts from Firebase
             for part_name, quantity_per_product in selected_parts.items():
                 total_quantity_needed = quantity_per_product * product_quantity
                 new_quantity = self.controller.db.inventory[part_name] - total_quantity_needed
+                self.controller.db.inventory[part_name] = new_quantity
                 self.controller.db.add_part(part_name, new_quantity)
 
             # Add product to Firebase
@@ -563,8 +573,6 @@ class EMAGApp:
             self.update_products_list()
             self.update_parts_list()
             messagebox.showinfo("Sukces", f"Produkt '{product_name}' został dodany.")
-
-
 
 
         ttkb.Button(
@@ -753,67 +761,69 @@ class EMAGApp:
 
 
     def check_for_updates(self):
-        """Check for updates by comparing the local version with the remote version."""
+        """Check for updates by comparing the local version with the latest release tag on GitHub."""
         try:
-            # URL of the version file and the update package in your GitHub repository
-            remote_version_url = "https://raw.githubusercontent.com/filiprzeszowski/EMAG/refs/tags/EMAG/config/config.py"
-            update_package_url = "https://github.com/filiprzeszowski/EMAG/releases/download/latest/update.zip"
-
-            # Fetch the remote version file
-            response = requests.get(remote_version_url)
+            # Fetch the latest release tag from GitHub's API
+            github_api_url = "https://api.github.com/repos/filiprzeszowski/EMAG/releases/latest"
+            response = requests.get(github_api_url)
             response.raise_for_status()  # Raise an exception for HTTP errors
 
-            # Get the latest version from the file
-            remote_version = response.text.strip()
+            # Parse the response JSON
+            latest_release = response.json()
+            latest_version = latest_release["tag_name"]  # Fetch the tag name
+            update_package_url = latest_release["zipball_url"]  # URL to download the release ZIP
 
             # Compare versions
-            if VERSION < remote_version:
+            if VERSION < latest_version:
                 # Ask user for confirmation to update
                 should_update = messagebox.askyesno(
                     "Aktualizacja dostępna",
-                    f"Nowa wersja ({remote_version}) jest dostępna. Aktualna wersja: {VERSION}.\n\n"
-                    "Czy pobrać aktualizację?"
+                    f"Nowa wersja ({latest_version}) jest dostępna. Aktualna wersja: {VERSION}.\n\n"
+                    "Czy chcesz pobrać i zainstalować aktualizację?"
                 )
                 if should_update:
                     self.download_and_apply_update(update_package_url)
+            else:
+                messagebox.showinfo("Aktualizacja", "Masz najnowszą wersję aplikacji.")
 
         except requests.exceptions.RequestException as e:
             print(f"Błąd sprawdzania aktualizacji: {e}")
-            messagebox.showerror("Błąd sprawdzania aktualizacji", "Zgłoszenie zostało wysłane.")
+            messagebox.showerror("Błąd sprawdzania aktualizacji", "Nie można sprawdzić dostępności aktualizacji.")
 
     def download_and_apply_update(self, update_package_url):
         """Download and apply the update package."""
+        update_zip_path = "update.zip"
+        extract_dir = "update_extracted"
         try:
-            # Download the update package
             response = requests.get(update_package_url, stream=True)
             response.raise_for_status()
-
-            # Save the zip file locally
-            update_zip_path = "update.zip"
             with open(update_zip_path, "wb") as update_file:
                 for chunk in response.iter_content(chunk_size=8192):
                     update_file.write(chunk)
-
-            # Extract the update package
             with zipfile.ZipFile(update_zip_path, "r") as zip_ref:
-                zip_ref.extractall(".")  # Extract into the current directory
-
-            # Clean up the downloaded zip file
-            os.remove(update_zip_path)
-
-            # Notify user and restart the app
-            messagebox.showinfo(
-                "Update Applied",
-                "The application has been updated successfully. The app will now restart."
-            )
+                zip_ref.extractall(extract_dir)
+            for root, dirs, files in os.walk(extract_dir):
+                for file in files:
+                    source_path = os.path.join(root, file)
+                    relative_path = os.path.relpath(source_path, extract_dir)
+                    destination_path = os.path.join(".", relative_path)
+                    os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+                    os.replace(source_path, destination_path)
+            messagebox.showinfo("Aktualizacja", "Aplikacja została zaktualizowana. Teraz uruchomi się ponownie.")
             self.restart_app()
-
         except requests.exceptions.RequestException as e:
-            print(f"Error downloading the update: {e}")
-            messagebox.showerror("Update Failed", "Failed to download the update. Please try again later.")
-        except zipfile.BadZipFile as e:
-            print(f"Error extracting the update package: {e}")
-            messagebox.showerror("Update Failed", "The update package is corrupted.")
+            print(f"Błąd pobierania aktualizacji: {e}")
+            messagebox.showerror("Błąd aktualizacji", "Nie udało się pobrać aktualizacji.")
+        except Exception as e:
+            print(f"Błąd podczas aktualizacji: {e}")
+            messagebox.showerror("Błąd aktualizacji", "Wystąpił błąd podczas aktualizacji.")
+        finally:
+            if os.path.exists(update_zip_path):
+                os.remove(update_zip_path)
+            if os.path.exists(extract_dir):
+                shutil.rmtree(extract_dir)
+
+
 
     def restart_app(self):
         """Restart the application."""
