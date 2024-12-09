@@ -20,8 +20,9 @@ class EMAGApp:
         self.root = root
         self.root.title("EMAG - Zarządzanie magazynem")
         self.root.state("zoomed")
-        self.dark_mode = False
+        self.dark_mode = True
         self.setup_styles()
+        self.style.theme_use("darkly")
         self.create_header()
         self.create_layout()
         self.create_status_bar()
@@ -180,14 +181,30 @@ class EMAGApp:
     def update_parts_list(self):
         """Update the parts list in the Treeview with Firebase data."""
         try:
+            # Load inventory from Firebase
             self.controller.db.load_inventory_from_firebase()
+
+            # Debug: Print inventory data
+            print("Inventory items:", list(self.controller.db.inventory.items()))
+
+            # Clear the treeview
             self.parts_list.delete(*self.parts_list.get_children())
+
+            # Populate the treeview
             for i, (part, quantity) in enumerate(self.controller.db.inventory.items()):
                 tag = "oddrow" if i % 2 == 0 else "evenrow"
+
+                # Debug: Print each item being inserted
+                print(f"Inserting part: {part}, quantity: {quantity}")
+
                 self.parts_list.insert("", "end", values=(part, quantity), tags=(tag,))
+            
+            # Force UI update
+            self.root.update_idletasks()
         except Exception as e:
             print(f"Error loading inventory: {e}")
             messagebox.showerror("Error", "Could not load inventory.")
+
 
 
     def create_header(self):
@@ -245,6 +262,9 @@ class EMAGApp:
             # Load products from Firebase
             self.controller.db.load_products_from_firebase()
 
+            # Debug: Print raw products data
+            print("Raw products:", self.controller.db.products)
+
             # Combine products with the same name and identical parts
             combined_products = {}
             for product in self.controller.db.products:
@@ -258,21 +278,33 @@ class EMAGApp:
                         "parts": product["parts"],
                     }
 
+            # Debug: Print combined products
+            print("Combined products:", combined_products)
+
             # Clear the TreeView
             self.products_list.delete(*self.products_list.get_children())
 
             # Populate the TreeView
-            for product in combined_products.values():
+            for i, product in enumerate(combined_products.values()):
                 parts_str = ", ".join(
                     [f"{part} ({qty})" for part, qty in product["parts"].items()]
                 )
+
+                # Debug: Print each product being inserted
+                print(f"Inserting product: {product['name']}, quantity: {product['quantity']}, parts: {parts_str}")
+
                 self.products_list.insert(
                     "",
                     "end",
                     values=(product["name"], product["quantity"], parts_str),
                 )
+            
+            # Force UI update
+            self.root.update_idletasks()
         except Exception as e:
             print(f"Error updating products list: {e}")
+            messagebox.showerror("Error", "Could not update products list.")
+
 
 
     def show_add_part_menu(self):
@@ -761,34 +793,25 @@ class EMAGApp:
 
 
     def check_for_updates(self):
-        """Check for updates by comparing the local version with the latest release tag on GitHub."""
+        """Check for updates."""
         try:
-            # Fetch the latest release tag from GitHub's API
-            github_api_url = "https://api.github.com/repos/filiprzeszowski/EMAG/releases/latest"
-            response = requests.get(github_api_url)
-            response.raise_for_status()  # Raise an exception for HTTP errors
+            response = requests.get("https://api.github.com/repos/filiprzeszowski/EMAG/releases/latest")
+            response.raise_for_status()
+            latest_version = response.json()["tag_name"]
 
-            # Parse the response JSON
-            latest_release = response.json()
-            latest_version = latest_release["tag_name"]  # Fetch the tag name
-            update_package_url = latest_release["zipball_url"]  # URL to download the release ZIP
-
-            # Compare versions
             if VERSION < latest_version:
-                # Ask user for confirmation to update
                 should_update = messagebox.askyesno(
                     "Aktualizacja dostępna",
-                    f"Nowa wersja ({latest_version}) jest dostępna. Aktualna wersja: {VERSION}.\n\n"
-                    "Czy chcesz pobrać i zainstalować aktualizację?"
+                    f"Nowa wersja ({latest_version}) jest dostępna. Czy chcesz zaktualizować?"
                 )
                 if should_update:
-                    self.download_and_apply_update(update_package_url)
+                    self.download_and_apply_update(response.json()["zipball_url"])
             else:
-                messagebox.showinfo("Aktualizacja", "Masz najnowszą wersję aplikacji.")
-
-        except requests.exceptions.RequestException as e:
+                messagebox.showinfo("Aktualizacja", "Masz najnowszą wersję.")
+        except Exception as e:
             print(f"Błąd sprawdzania aktualizacji: {e}")
-            messagebox.showerror("Błąd sprawdzania aktualizacji", "Nie można sprawdzić dostępności aktualizacji.")
+            messagebox.showerror("Błąd aktualizacji", "Nie udało się sprawdzić.")
+
 
     def download_and_apply_update(self, update_package_url):
         """Download and apply the update package."""

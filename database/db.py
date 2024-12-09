@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from firebase_admin import credentials, initialize_app, db
 
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path)
 
 class Database:
@@ -13,22 +13,35 @@ class Database:
 
     def initialize_firebase(self):
         """Initialize Firebase Admin SDK."""
-        firebase_key_path = os.getenv("FIREBASE_KEY_PATH")
-        print(f"Firebase Key Path: {firebase_key_path}")
-        if not os.path.exists(firebase_key_path):
-            raise FileNotFoundError(f"The Firebase key file was not found at: {firebase_key_path}")
-
-        if not firebase_key_path:
-            raise FileNotFoundError("The Firebase key path is not set or the .env file is missing.")
-        
         try:
-            cred = credentials.Certificate(firebase_key_path)
+            database_url = os.getenv("FIREBASE_DATABASE_URL")
+            if not database_url:
+                raise ValueError("FIREBASE_DATABASE_URL is not set or could not be loaded")
+            
+            print("Loaded Firebase Database URL:", database_url)
+
+            cred = credentials.Certificate({
+                "type": os.getenv("FIREBASE_TYPE"),
+                "project_id": os.getenv("FIREBASE_PROJECT_ID"),
+                "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
+                "private_key": os.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n"),
+                "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
+                "client_id": os.getenv("FIREBASE_CLIENT_ID"),
+                "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
+                "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
+                "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_X509_CERT_URL"),
+                "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL"),
+            })
+
             initialize_app(cred, {
-                "databaseURL": "https://emag-14f01-default-rtdb.europe-west1.firebasedatabase.app/"
+                "databaseURL": database_url,
             })
             print("Firebase initialized successfully.")
         except Exception as e:
             raise RuntimeError(f"Failed to initialize Firebase: {str(e)}")
+
+
+
 
     # Inventory-related methods
     def add_part(self, name, quantity):
