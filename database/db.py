@@ -41,7 +41,27 @@ class Database:
             raise RuntimeError(f"Failed to initialize Firebase: {str(e)}")
 
 
+    def verify_ean_in_firebase(self, ean):
+        """Check if an EAN exists in Firebase."""
+        try:
+            ref = db.reference("ean_codes")
+            ean_data = ref.child(ean).get()
+            if ean_data:
+                return ean_data.get("name")
+            return None
+        except Exception as e:
+            print(f"Error verifying EAN in Firebase: {e}")
+            raise
 
+    def add_ean_to_firebase(self, ean, name):
+        """Add a new EAN code to Firebase."""
+        try:
+            ref = db.reference(f"ean_codes/{ean}")
+            ref.set({"name": name})
+            print(f"EAN '{ean}' with name '{name}' added to Firebase.")
+        except Exception as e:
+            print(f"Error adding EAN '{ean}' to Firebase: {e}")
+            raise
 
     # Inventory-related methods
     def add_part(self, name, quantity):
