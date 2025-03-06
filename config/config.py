@@ -1,3 +1,3 @@
 # Konfiguracja aplikacji EMAG
 APP_NAME = "EMAG - Zarządzanie magazynem"
-VERSION = "v1.1.3"
+VERSION = "v1.2.0"

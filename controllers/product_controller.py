@@ -53,11 +53,19 @@ class ProductController:
                 return False
 
         # Deduct parts from inventory
-        for part_name, quantity in selected_parts.items():
-            if self.db.inventory[part_name] < quantity:
-                print(f"Niewystarczająca ilość dla części '{part_name}'.")
-                return False
-            self.db.inventory[part_name] -= quantity
+        for part_name, part_quantity in product["parts"].items():
+            required_quantity = delta * part_quantity
+            available_quantity = self.controller.db.inventory.get(part_name, 0)
+
+            if required_quantity > available_quantity:
+                messagebox.showerror(
+                    "Błąd",
+                    f"Niewystarczająca ilość części '{part_name}' (potrzeba: {required_quantity}, dostępne: {available_quantity})."
+                )
+                return  # Stop product creation
+
+            self.controller.db.inventory[part_name] -= required_quantity  # Deduct parts correctly
+
 
         # Add product to the database
         self.db.products.append({
