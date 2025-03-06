@@ -3,7 +3,7 @@ from tkinter import messagebox, simpledialog
 import customtkinter as ctk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-
+from firebase_admin import db
 from controllers.product_controller import ProductController
 from database.db import Database
 
@@ -274,22 +274,20 @@ class EMAGApp:
         ctk.CTkLabel(frame, text="Ilość:").pack(anchor="w", padx=5)
         ctk.CTkEntry(frame, textvariable=quantity_var, width=100).pack(pady=5)
 
-        def add_part():
-            name = part_name_var.get().strip()
-            q_str = quantity_var.get().strip()
-            if not name or not q_str.isdigit():
-                messagebox.showerror("Błąd", "Podaj poprawną nazwę i liczbę.")
-                return
+        def add_part(self, name, quantity):
+            """
+            Adds 'quantity' units of 'name' to local inventory, 
+            then sets the final total in Firebase (no second increment).
+            """
+            current_qty = self.inventory.get(name, 0)
+            new_qty = current_qty + quantity
+            self.inventory[name] = new_qty
 
-            q_int = int(q_str)
-            if q_int <= 0:
-                messagebox.showerror("Błąd", "Ilość musi być większa od 0.")
-                return
+            # Write that final absolute value to Firebase
+            ref = db.reference("inventory")
+            ref.child(name).set(new_qty)
+            print(f"Part '{name}' updated to {new_qty} in Firebase.")
 
-            # Add to Firebase
-            self.db.add_part(name, q_int)
-            self.update_parts_list()
-            messagebox.showinfo("Sukces", f"Dodano część '{name}' (x{q_int}).")
 
         ctk.CTkButton(frame, text="Dodaj", command=add_part).pack(pady=10)
 
